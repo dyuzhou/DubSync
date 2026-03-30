@@ -115,6 +115,8 @@ function sendTracks(videoId: string, captionTracks: any[]) {
   });
 }
 
+let fetchTimeout: any = null;
+
 async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: string) {
   const cacheKey = `${videoId}_${tlang || 'original'}`;
   if (subtitleCache.has(cacheKey)) {
@@ -126,54 +128,65 @@ async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: strin
     return;
   }
 
-  try {
-    let url = baseUrl;
-    if (!url.includes('fmt=')) {
-      url += (url.includes('?') ? '&' : '?') + 'fmt=json3';
-    }
-    if (tlang && !url.includes('tlang=')) {
-      url += `&tlang=${tlang}`;
-    }
+  // Debounce multiple requests for the same video/track
+  if (fetchTimeout) clearTimeout(fetchTimeout);
+  
+  fetchTimeout = setTimeout(async () => {
+    try {
+      let url = baseUrl;
+      if (!url.includes('fmt=')) {
+        url += (url.includes('?') ? '&' : '?') + 'fmt=json3';
+      }
+      if (tlang && !url.includes('tlang=')) {
+        url += `&tlang=${tlang}`;
+      }
 
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetch(url);
+      
+      if (response.status === 429) {
+        console.warn('DubSync: Rate limited by YouTube (429). Waiting before retry...');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('DubSync: Received non-JSON response', text.substring(0, 100));
+        throw new Error('Received non-JSON response from YouTube');
+      }
+
+      const data = await response.json();
+      const events = data.events || [];
+      
+      const subtitles = events
+        .filter((e: any) => e.segs)
+        .map((e: any, index: number) => ({
+          id: `${videoId}_${index}`,
+          start: e.tStartMs / 1000,
+          duration: e.dDurationMs / 1000,
+          text: e.segs.map((s: any) => s.utf8).join('').trim()
+        }));
+
+      // Manage cache (max 10)
+      if (subtitleCache.size >= 10) {
+        const firstKey = subtitleCache.keys().next().value;
+        subtitleCache.delete(firstKey);
+      }
+      subtitleCache.set(cacheKey, subtitles);
+
+      sendMessage({
+        type: 'YOUTUBE_SUBTITLES_LOADED',
+        videoId,
+        subtitles
+      });
+    } catch (e) {
+      console.error('DubSync: Failed to fetch track content', e);
     }
-
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('DubSync: Received non-JSON response', text.substring(0, 100));
-      throw new Error('Received non-JSON response from YouTube');
-    }
-
-    const data = await response.json();
-    const events = data.events || [];
-    
-    const subtitles = events
-      .filter((e: any) => e.segs)
-      .map((e: any, index: number) => ({
-        id: `${videoId}_${index}`,
-        start: e.tStartMs / 1000,
-        duration: e.dDurationMs / 1000,
-        text: e.segs.map((s: any) => s.utf8).join('').trim()
-      }));
-
-    // Manage cache (max 10)
-    if (subtitleCache.size >= 10) {
-      const firstKey = subtitleCache.keys().next().value;
-      subtitleCache.delete(firstKey);
-    }
-    subtitleCache.set(cacheKey, subtitles);
-
-    sendMessage({
-      type: 'YOUTUBE_SUBTITLES_LOADED',
-      videoId,
-      subtitles
-    });
-  } catch (e) {
-    console.error('DubSync: Failed to fetch track content', e);
-  }
+  }, 500); // 500ms debounce
 }
 
 function findVideo() {
