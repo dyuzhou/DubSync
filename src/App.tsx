@@ -14,7 +14,7 @@ import { Youtube, Zap } from 'lucide-react';
 export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [tracks, setTracks] = useState<SubtitleTrack[]>([]);
+  const [tracks, setTracks] = useState<any[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string>('');
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isDark, setIsDark] = useState(false);
@@ -46,7 +46,24 @@ export default function App() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const { type, playbackRate, currentTime: ytTime, isDark: ytIsDark } = event.data;
+      const { type, playbackRate, currentTime: ytTime, isDark: ytIsDark, tracks: ytTracks, subtitles: ytSubtitles } = event.data;
+      
+      if (type === 'YOUTUBE_TRACKS_FOUND' && ytTracks) {
+        setTracks(ytTracks);
+        // Auto-select first track if none selected
+        if (ytTracks.length > 0 && !selectedTrackId) {
+          const savedTrackId = localStorage.getItem('vidpilot_track_id');
+          const trackToSelect = ytTracks.find((t: any) => t.id === savedTrackId) || ytTracks[0];
+          setSelectedTrackId(trackToSelect.id);
+        }
+      }
+
+      if (type === 'YOUTUBE_SUBTITLES_LOADED' && ytSubtitles) {
+        setTracks(prev => prev.map(t => 
+          t.id === selectedTrackId ? { ...t, subtitles: ytSubtitles } : t
+        ));
+      }
+
       if (type === 'YOUTUBE_RATE_CHANGE' && playbackRate !== undefined) {
         setSettings(s => ({ ...s, playbackRate }));
       }
@@ -61,7 +78,17 @@ export default function App() {
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [selectedTrackId]);
+
+  useEffect(() => {
+    const currentTrack = tracks.find(t => t.id === selectedTrackId);
+    if (currentTrack && !currentTrack.subtitles) {
+      window.postMessage({
+        type: 'FETCH_YOUTUBE_SUBTITLES',
+        baseUrl: currentTrack.baseUrl
+      }, '*');
+    }
+  }, [selectedTrackId, tracks]);
 
   useEffect(() => {
     const loadVoices = () => {
@@ -80,22 +107,11 @@ export default function App() {
   }, [settings.voice]);
 
   useEffect(() => {
-    fetchSubtitleTracks('mock-video-id').then(data => {
-      setTracks(data);
-      const savedTrackId = localStorage.getItem('vidpilot_track_id');
-      if (savedTrackId && data.some(t => t.id === savedTrackId)) {
-        setSelectedTrackId(savedTrackId);
-      } else if (data.length > 0) {
-        setSelectedTrackId(data[1].id);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
     const currentTrack = tracks.find(t => t.id === selectedTrackId);
-    if (!currentTrack) return;
+    if (!currentTrack || !currentTrack.subtitles) return;
+    
     const activeSubtitle = currentTrack.subtitles.find(
-      sub => currentTime >= sub.start && currentTime < sub.start + sub.duration
+      (sub: any) => currentTime >= sub.start && currentTime < sub.start + sub.duration
     );
     
     // Update overlay
@@ -136,10 +152,10 @@ export default function App() {
             </div>
             <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'} tracking-tight`}>DubSync</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-            <span className={`text-[9px] font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'} uppercase tracking-tighter`}>
-              {isPlaying ? '正在同步' : '已暂停'}
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+            <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
+            <span className={`text-[9px] font-bold ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-tighter`}>
+              {isPlaying ? '正在同步 (Syncing)' : '视频已暂停 (Paused)'}
             </span>
           </div>
         </div>
