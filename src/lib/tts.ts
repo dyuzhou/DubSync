@@ -8,7 +8,7 @@ export class TTSManager {
   private pendingSubtitle: Subtitle | null = null;
   private pendingSettings: TTSSettings | null = null;
   private pendingRateOverride: number | undefined = undefined;
-  private readonly maxRate = 4.0;
+  private readonly maxRate = 5.0;
 
   private isChinese(text: string): boolean {
     return /[\u4e00-\u9fa5]/.test(text);
@@ -94,7 +94,11 @@ export class TTSManager {
       }
     };
     utterance.onerror = (event) => {
-      console.error('DubSync: Browser TTS error', event.error || event);
+      const error = (event as any).error;
+      if (error === 'interrupted' || error === 'cancelled' || error === 'canceled') {
+        return;
+      }
+      console.error('DubSync: Browser TTS error', error || event);
     };
 
     this.currentUtterance = utterance;

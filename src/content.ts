@@ -169,7 +169,7 @@ async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: strin
           return;
         }
       } else {
-        console.warn('DubSync: Non-JSON subtitle response, skipping', text.substring(0, 100));
+        console.debug('DubSync: Non-JSON subtitle response, skipping', text.substring(0, 100));
         return;
       }
 

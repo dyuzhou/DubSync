@@ -237,7 +237,7 @@ export default function App() {
 
         const activeIndex = currentTrack.subtitles.findIndex((sub: any) => sub.id === activeSubtitle.id);
         const nextSubtitle = activeIndex >= 0 ? currentTrack.subtitles[activeIndex + 1] : null;
-        const baseTtsRate = settings.playbackRate * 1.5;
+        const baseTtsRate = settings.playbackRate * 3;
         let adjustedRate: number | undefined = baseTtsRate;
 
         if (settings.autoSync && nextSubtitle) {
@@ -248,9 +248,9 @@ export default function App() {
           if (subtitleEnd > nextSubtitle.start && timeToNextStart > 0 && remainingSchedule > 0) {
             const overlap = subtitleEnd - nextSubtitle.start;
             const speedFactor = 1 + Math.min(overlap / Math.max(0.1, remainingSchedule), 0.5);
-            adjustedRate = Math.min(3.5, baseTtsRate * speedFactor);
+            adjustedRate = Math.min(5, baseTtsRate * speedFactor);
           } else if (subtitleEnd > nextSubtitle.start && timeToNextStart <= 0) {
-            adjustedRate = Math.min(3.5, baseTtsRate * 1.5);
+            adjustedRate = Math.min(5, baseTtsRate * 1.5);
           }
         }
 
