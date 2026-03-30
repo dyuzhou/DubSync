@@ -14,12 +14,9 @@ export default defineConfig(({mode}) => {
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
-          content: path.resolve(__dirname, 'src/content.ts'),
         },
         output: {
-          entryFileNames: (chunkInfo) => {
-            return chunkInfo.name === 'content' ? 'content.js' : 'assets/[name]-[hash].js';
-          },
+          entryFileNames: 'assets/[name]-[hash].js',
         },
       },
     },

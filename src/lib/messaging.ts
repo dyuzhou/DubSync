@@ -17,6 +17,20 @@ export const sendMessage = (message: any) => {
   
   // Also use window.postMessage for simulation/same-page communication
   window.postMessage(message, '*');
+  
+  // If we are in an iframe, send to parent
+  if (window.parent !== window) {
+    window.parent.postMessage(message, '*');
+  }
+
+  // If we are in the main page, try to send to the DubSync side panel iframe
+  const container = document.getElementById('dubsync-container');
+  if (container && container.shadowRoot) {
+    const iframe = container.shadowRoot.getElementById('panel-iframe') as HTMLIFrameElement;
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage(message, '*');
+    }
+  }
 };
 
 export const addMessageListener = (callback: (message: any) => void) => {
