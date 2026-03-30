@@ -184,6 +184,10 @@ function detectTheme() {
                  document.body.classList.contains('dark') ||
                  window.matchMedia('(prefers-color-scheme: dark)').matches;
   
+  if (sidePanel) {
+    sidePanel.classList.toggle('dark', isDark);
+  }
+
   sendMessage({
     type: 'YOUTUBE_THEME_CHANGE',
     isDark
@@ -193,6 +197,212 @@ function detectTheme() {
 // Initial search
 findVideo();
 detectTheme();
+createUI();
+injectInterceptor();
+setInterval(monitorTimedText, 3000);
+
+let floatingBall: HTMLDivElement | null = null;
+let sidePanel: HTMLDivElement | null = null;
+let isPanelOpen = false;
+
+function createUI() {
+  if (document.getElementById('dubsync-container')) return;
+
+  const container = document.createElement('div');
+  container.id = 'dubsync-container';
+  document.body.appendChild(container);
+
+  const shadow = container.attachShadow({ mode: 'open' });
+
+  // Add styles to shadow DOM
+  const style = document.createElement('style');
+  style.textContent = `
+    :host {
+      all: initial;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    #floating-ball {
+      position: fixed;
+      right: 30px;
+      top: 400px;
+      width: 56px;
+      height: 56px;
+      background: #2563eb;
+      border-radius: 50%;
+      cursor: move;
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    #floating-ball:hover {
+      background: #1d4ed8;
+      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.5);
+    }
+    #floating-ball:active {
+      transform: scale(0.95);
+    }
+    #floating-ball svg {
+      width: 28px;
+      height: 28px;
+      color: white;
+    }
+    #side-panel {
+      position: fixed;
+      right: -420px;
+      top: 20px;
+      width: 400px;
+      height: calc(100vh - 40px);
+      background: white;
+      z-index: 999998;
+      box-shadow: -8px 0 32px rgba(0,0,0,0.15);
+      transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 24px 0 0 24px;
+    }
+    #side-panel.open {
+      right: 0;
+    }
+    #panel-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .dark #side-panel {
+      background: #0f0f0f;
+      color: white;
+    }
+  `;
+  shadow.appendChild(style);
+
+  // Create Floating Ball
+  floatingBall = document.createElement('div');
+  floatingBall.id = 'floating-ball';
+  floatingBall.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+    </svg>
+  `;
+  shadow.appendChild(floatingBall);
+
+  // Create Side Panel
+  sidePanel = document.createElement('div');
+  sidePanel.id = 'side-panel';
+  const iframe = document.createElement('iframe');
+  iframe.id = 'panel-iframe';
+  // Use the extension's popup page as the source for the iframe
+  iframe.src = chrome.runtime.getURL('index.html');
+  sidePanel.appendChild(iframe);
+  shadow.appendChild(sidePanel);
+
+  // Dragging logic
+  let isDragging = false;
+  let startY = 0;
+  let startTop = 0;
+
+  floatingBall.addEventListener('mousedown', (e) => {
+    isDragging = false;
+    startY = e.clientY;
+    startTop = floatingBall!.offsetTop;
+    
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (Math.abs(moveEvent.clientY - startY) > 5) {
+        isDragging = true;
+      }
+      const newTop = startTop + (moveEvent.clientY - startY);
+      floatingBall!.style.top = `${newTop}px`;
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      
+      if (!isDragging) {
+        togglePanel();
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+
+  function togglePanel() {
+    isPanelOpen = !isPanelOpen;
+    sidePanel?.classList.toggle('open', isPanelOpen);
+    if (isPanelOpen) {
+      floatingBall?.style.setProperty('transform', 'translateX(-380px)');
+    } else {
+      floatingBall?.style.setProperty('transform', 'translateX(0)');
+    }
+  }
+}
+
+// Intercept timedtext API parameters by monitoring script tags and global variables
+function monitorTimedText() {
+  // YouTube often stores caption info in ytInitialPlayerResponse
+  const player = document.getElementById('movie_player') as any;
+  if (player && player.getOptions) {
+    try {
+      const captionTracks = player.getOptions('captions')?.captionTracks;
+      if (captionTracks && captionTracks.length > 0) {
+        sendMessage({
+          type: 'YOUTUBE_TRACKS_FOUND',
+          videoId: currentVideoId,
+          tracks: captionTracks.map((t: any) => ({
+            id: t.vss_id,
+            language: t.name.simpleText || t.languageCode,
+            baseUrl: t.baseUrl,
+            isAutoGenerated: t.kind === 'asr'
+          }))
+        });
+      } else {
+        // Fallback: If no tracks found, try to click the caption button to trigger loading
+        const captionBtn = document.querySelector('.ytp-subtitles-button') as HTMLElement;
+        if (captionBtn && captionBtn.getAttribute('aria-pressed') === 'false') {
+          console.log('DubSync: No tracks found, attempting to trigger captions by clicking button');
+          captionBtn.click();
+        }
+      }
+    } catch (e) {}
+  }
+}
+
+// Inject a script to intercept network requests (fetch/XHR)
+function injectInterceptor() {
+  const script = document.createElement('script');
+  script.textContent = `
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = async (...args) => {
+        const response = await originalFetch(...args);
+        const url = args[0] instanceof Request ? args[0].url : args[0];
+        if (url.includes('youtube.com/api/timedtext')) {
+          const clone = response.clone();
+          const text = await clone.text();
+          window.postMessage({ type: 'TIMEDTEXT_INTERCEPTED', url, text }, '*');
+        }
+        return response;
+      };
+
+      const originalOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this.addEventListener('load', function() {
+          if (url.includes('youtube.com/api/timedtext')) {
+            window.postMessage({ type: 'TIMEDTEXT_INTERCEPTED', url, text: this.responseText }, '*');
+          }
+        });
+        return originalOpen.apply(this, arguments);
+      };
+    })();
+  `;
+  (document.head || document.documentElement).appendChild(script);
+}
 
 // Watch for navigation and video changes
 const observer = new MutationObserver(() => {
@@ -200,7 +410,10 @@ const observer = new MutationObserver(() => {
   const videoId = urlParams.get('v');
   
   if (videoId && videoId !== currentVideoId) {
+    currentVideoId = videoId;
     findVideo();
+    getYoutubeCaptions();
+    createUI();
   } else if (!videoElement) {
     findVideo();
   }
@@ -211,6 +424,53 @@ observer.observe(document.body, { childList: true, subtree: true });
 
 // Listen for messages from the popup/UI
 window.addEventListener('message', (event) => {
+  if (event.data.type === 'TIMEDTEXT_INTERCEPTED') {
+    const { url, text } = event.data;
+    const urlObj = new URL(url);
+    const videoId = urlObj.searchParams.get('v');
+    
+    if (videoId && text) {
+      try {
+        let subtitles: any[] = [];
+        if (text.startsWith('{')) {
+          // JSON format
+          const data = JSON.parse(text);
+          subtitles = data.events
+            .filter((e: any) => e.segs)
+            .map((e: any, index: number) => ({
+              id: `${videoId}-${index}`,
+              start: e.tStartMs / 1000,
+              duration: e.dDurationMs / 1000,
+              text: e.segs.map((s: any) => s.utf8).join('')
+            }));
+        } else {
+          // XML format
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(text, "text/xml");
+          const textNodes = xmlDoc.getElementsByTagName('text');
+          subtitles = Array.from(textNodes).map((node, index) => ({
+            id: `${videoId}-${index}`,
+            start: parseFloat(node.getAttribute('start') || '0'),
+            duration: parseFloat(node.getAttribute('dur') || '0'),
+            text: node.textContent || ''
+          }));
+        }
+
+        if (subtitles.length > 0) {
+          console.log('DubSync: Successfully parsed intercepted subtitles', subtitles.length);
+          sendMessage({
+            type: 'YOUTUBE_SUBTITLES_LOADED',
+            videoId,
+            subtitles
+          });
+          // Cache it
+          subtitleCache.set(videoId, subtitles);
+        }
+      } catch (e) {
+        console.error('DubSync: Error parsing intercepted timedtext', e);
+      }
+    }
+  }
   if (event.data.type === 'SET_YOUTUBE_RATE' && videoElement) {
     videoElement.playbackRate = event.data.rate;
   }
