@@ -7,12 +7,12 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       input: {
-        content: path.resolve(__dirname, 'src/content.ts'),
+        interceptor: path.resolve(__dirname, 'src/interceptor.ts'),
       },
       output: {
         format: 'iife',
-        name: 'DubSyncContent',
-        entryFileNames: 'content.js',
+        name: 'DubSyncInterceptor',
+        entryFileNames: 'interceptor.js',
         inlineDynamicImports: true,
       },
     },
