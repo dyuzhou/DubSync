@@ -1,6 +1,6 @@
 import { Subtitle } from '../types';
 
-const sentenceSplitRegex = /[^。.！？!?；;]+[。.！？!?；;]?/g;
+const sentenceSplitRegex = /[^。！？!?；;，,]+[。！？!?；;，,]?/g;
 
 function normalizeText(text: string) {
   return (text || '')
@@ -17,7 +17,24 @@ export function splitSubtitleTextIntoSentences(text: string): string[] {
     return [normalized];
   }
 
-  const segments = matches.map(segment => segment.trim()).filter(Boolean);
+  const rawSegments = matches.map(segment => segment.trim()).filter(Boolean);
+  if (rawSegments.length === 0) return [normalized];
+
+  const segments: string[] = [];
+  for (const segment of rawSegments) {
+    if (!segments.length) {
+      segments.push(segment);
+      continue;
+    }
+
+    const shouldMerge = segment.length <= 3 || /^[，,；;]/.test(segment) || /[，,；;]$/.test(segments[segments.length - 1]);
+    if (shouldMerge) {
+      segments[segments.length - 1] = `${segments[segments.length - 1]}${segment}`;
+    } else {
+      segments.push(segment);
+    }
+  }
+
   return segments.length > 0 ? segments : [normalized];
 }
 

@@ -544,14 +544,15 @@ window.addEventListener('message', (event) => {
         }
 
         if (subtitles.length > 0) {
-          console.log('DubSync: Successfully parsed intercepted subtitles', subtitles.length);
+          const sentenceSubtitles = splitSubtitlesBySentence(subtitles);
+          console.log('DubSync: Successfully parsed intercepted subtitles', sentenceSubtitles.length);
           sendMessage({
             type: 'YOUTUBE_SUBTITLES_LOADED',
             videoId,
-            subtitles
+            subtitles: sentenceSubtitles
           });
           // Cache it
-          subtitleCache.set(videoId, subtitles);
+          subtitleCache.set(videoId, sentenceSubtitles);
         }
       } catch (e) {
         console.error('DubSync: Error parsing intercepted timedtext', e);

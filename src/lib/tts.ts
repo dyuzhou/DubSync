@@ -139,10 +139,7 @@ export class TTSManager {
       if (this.currentSubtitleId === subtitle.id) {
         return;
       }
-      this.pendingSubtitle = subtitle;
-      this.pendingSettings = settings;
-      this.pendingRateOverride = rateOverride;
-      return;
+      this.cancelCurrentUtterance(true);
     }
 
     this.currentSubtitleId = subtitle.id;
