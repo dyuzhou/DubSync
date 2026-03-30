@@ -1,4 +1,6 @@
 import { sendMessage } from './lib/messaging';
+import { Subtitle } from './types';
+import { splitSubtitlesBySentence } from './lib/subtitles';
 
 let videoElement: HTMLVideoElement | null = null;
 let subtitleOverlay: HTMLDivElement | null = null;
@@ -175,7 +177,7 @@ async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: strin
 
       const events = data.events || [];
       
-      const subtitles = events
+      const rawSubtitles = events
         .filter((e: any) => e.segs)
         .map((e: any, index: number) => ({
           id: `${videoId}_${index}`,
@@ -183,7 +185,9 @@ async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: strin
           duration: e.dDurationMs / 1000,
           text: e.segs.map((s: any) => s.utf8).join('').trim()
         }))
-        .filter((sub: any) => isValidSubtitleText(sub.text));
+        .filter((sub: Subtitle) => isValidSubtitleText(sub.text));
+
+      const subtitles = splitSubtitlesBySentence(rawSubtitles);
 
       // Manage cache (max 10)
       if (subtitleCache.size >= 10) {
