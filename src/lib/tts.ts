@@ -2,6 +2,9 @@ import { Subtitle, TTSSettings } from "../types";
 
 export class TTSManager {
   private currentUtterance: SpeechSynthesisUtterance | null = null;
+  private currentSubtitleId: string | null = null;
+  private currentSegments: string[] = [];
+  private currentSegmentIndex = 0;
   private pendingSubtitle: Subtitle | null = null;
   private pendingSettings: TTSSettings | null = null;
   private pendingRateOverride: number | undefined = undefined;
@@ -36,12 +39,23 @@ export class TTSManager {
     return Math.max(0.1, Math.min(baseRate, this.maxRate));
   }
 
-  private speakWithBrowserTTS(text: string, settings: TTSSettings, rateOverride?: number) {
+  private splitTextSegments(text: string): string[] {
+    const cleaned = text.replace(/\s+/g, ' ').trim();
+    if (!cleaned) return [];
+
+    const matches = cleaned.match(/[^。.！？!?；;]+[。.！？!?；;]?/g);
+    if (!matches) return [cleaned];
+
+    const segments = matches.map(segment => segment.trim()).filter(Boolean);
+    return segments.length > 0 ? segments : [cleaned];
+  }
+
+  private speakSegment(text: string, settings: TTSSettings, rateOverride?: number) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       throw new Error('Browser SpeechSynthesis is not available in this environment.');
     }
 
-    this.stop();
+    this.cancelCurrentUtterance();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.isChinese(text) ? 'zh-CN' : 'en-US';
@@ -58,6 +72,17 @@ export class TTSManager {
       if (this.currentUtterance === utterance) {
         this.currentUtterance = null;
       }
+      const isLastSegment = this.currentSegmentIndex >= this.currentSegments.length - 1;
+      if (!isLastSegment) {
+        this.currentSegmentIndex += 1;
+        this.playCurrentSegment(settings, rateOverride);
+        return;
+      }
+
+      this.currentSubtitleId = null;
+      this.currentSegments = [];
+      this.currentSegmentIndex = 0;
+
       if (this.pendingSubtitle && this.pendingSettings) {
         const nextSubtitle = this.pendingSubtitle;
         const nextSettings = this.pendingSettings;
@@ -76,9 +101,29 @@ export class TTSManager {
     window.speechSynthesis.speak(utterance);
   }
 
+  private playCurrentSegment(settings: TTSSettings, rateOverride?: number) {
+    const segment = this.currentSegments[this.currentSegmentIndex];
+    if (!segment) {
+      return;
+    }
+    this.speakSegment(segment, settings, rateOverride);
+  }
+
   async prefetch(subtitles: Subtitle[], settings: TTSSettings) {
     // Prefetch is not needed for built-in browser TTS.
     return;
+  }
+
+  private cancelCurrentUtterance(clearPending: boolean = false) {
+    if (this.currentUtterance) {
+      window.speechSynthesis.cancel();
+      this.currentUtterance = null;
+    }
+    if (clearPending) {
+      this.pendingSubtitle = null;
+      this.pendingSettings = null;
+      this.pendingRateOverride = undefined;
+    }
   }
 
   async speak(subtitle: Subtitle, settings: TTSSettings, rateOverride?: number) {
@@ -87,27 +132,31 @@ export class TTSManager {
     }
 
     if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking && this.currentUtterance) {
+      if (this.currentSubtitleId === subtitle.id) {
+        return;
+      }
       this.pendingSubtitle = subtitle;
       this.pendingSettings = settings;
       this.pendingRateOverride = rateOverride;
       return;
     }
 
+    this.currentSubtitleId = subtitle.id;
+    this.currentSegments = this.splitTextSegments(subtitle.text);
+    this.currentSegmentIndex = 0;
+
     try {
-      this.speakWithBrowserTTS(subtitle.text, settings, rateOverride);
+      this.playCurrentSegment(settings, rateOverride);
     } catch (e) {
       console.error('DubSync: Failed to speak with browser TTS', e);
     }
   }
 
   stop() {
-    if (this.currentUtterance) {
-      window.speechSynthesis.cancel();
-      this.currentUtterance = null;
-    }
-    this.pendingSubtitle = null;
-    this.pendingSettings = null;
-    this.pendingRateOverride = undefined;
+    this.cancelCurrentUtterance(true);
+    this.currentSubtitleId = null;
+    this.currentSegments = [];
+    this.currentSegmentIndex = 0;
   }
 
   clearCache() {

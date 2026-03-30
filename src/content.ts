@@ -157,14 +157,22 @@ async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: strin
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('DubSync: Received non-JSON response', text.substring(0, 100));
-        throw new Error('Received non-JSON response from YouTube');
+      const contentType = response.headers.get('content-type') || '';
+      const text = await response.text();
+      let data: any;
+
+      if (contentType.includes('application/json') || text.trim().startsWith('{')) {
+        try {
+          data = JSON.parse(text);
+        } catch (err) {
+          console.error('DubSync: Failed to parse subtitle JSON', err, text.substring(0, 100));
+          return;
+        }
+      } else {
+        console.warn('DubSync: Non-JSON subtitle response, skipping', text.substring(0, 100));
+        return;
       }
 
-      const data = await response.json();
       const events = data.events || [];
       
       const subtitles = events
