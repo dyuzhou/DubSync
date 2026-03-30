@@ -242,9 +242,9 @@ export default function App() {
           if (subtitleEnd > nextSubtitle.start && timeToNextStart > 0 && remainingSchedule > 0) {
             const overlap = subtitleEnd - nextSubtitle.start;
             const speedFactor = 1 + overlap / Math.max(0.1, remainingSchedule);
-            adjustedRate = Math.min(2, settings.playbackRate * speedFactor);
+            adjustedRate = Math.min(4, settings.playbackRate * 2.5 * speedFactor);
           } else if (subtitleEnd > nextSubtitle.start && timeToNextStart <= 0) {
-            adjustedRate = 2;
+            adjustedRate = 4;
           }
         }
 

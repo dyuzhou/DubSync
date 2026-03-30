@@ -5,6 +5,8 @@ export class TTSManager {
   private pendingSubtitle: Subtitle | null = null;
   private pendingSettings: TTSSettings | null = null;
   private pendingRateOverride: number | undefined = undefined;
+  private readonly baseRateMultiplier = 2.5;
+  private readonly maxRate = 4.0;
 
   private isChinese(text: string): boolean {
     return /[\u4e00-\u9fa5]/.test(text);
@@ -30,6 +32,11 @@ export class TTSManager {
     return voices.find(voice => voice.lang.toLowerCase().startsWith('en')) || voices[0];
   }
 
+  private getEffectiveRate(settings: TTSSettings, rateOverride?: number) {
+    const baseRate = rateOverride ?? settings.playbackRate * this.baseRateMultiplier;
+    return Math.max(0.1, Math.min(baseRate, this.maxRate));
+  }
+
   private speakWithBrowserTTS(text: string, settings: TTSSettings, rateOverride?: number) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       throw new Error('Browser SpeechSynthesis is not available in this environment.');
@@ -40,7 +47,7 @@ export class TTSManager {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.isChinese(text) ? 'zh-CN' : 'en-US';
     utterance.volume = settings.volume;
-    utterance.rate = Math.max(0.1, Math.min(rateOverride ?? settings.playbackRate, 2));
+    utterance.rate = this.getEffectiveRate(settings, rateOverride);
     utterance.pitch = Math.max(0.1, Math.min(settings.pitch, 2));
 
     const browserVoice = this.getBrowserVoice(text, settings);
