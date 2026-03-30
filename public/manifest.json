@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "VidPilot Clone - YouTube TTS Dubber",
+  "name": "DubSync - YouTube TTS Dubber",
   "version": "1.0.0",
   "description": "A professional YouTube subtitle translator and TTS dubbing tool with Edge TTS support.",
   "permissions": [
@@ -12,22 +12,12 @@
     "https://www.youtube.com/*"
   ],
   "action": {
-    "default_popup": "index.html",
-    "default_icon": {
-      "16": "icon16.png",
-      "48": "icon48.png",
-      "128": "icon128.png"
-    }
+    "default_popup": "index.html"
   },
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/watch*"],
       "js": ["content.js"]
     }
-  ],
-  "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  }
+  ]
 }
