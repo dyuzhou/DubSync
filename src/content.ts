@@ -4,6 +4,9 @@ let videoElement: HTMLVideoElement | null = null;
 let subtitleOverlay: HTMLDivElement | null = null;
 let currentSettings: any = { showOverlay: true, overlayOpacity: 0.8, overlaySize: 24 };
 let currentVideoId: string | null = null;
+let floatingBall: HTMLDivElement | null = null;
+let sidePanel: HTMLDivElement | null = null;
+let isPanelOpen = false;
 
 // Cache for subtitles (max 10 videos)
 const subtitleCache: Map<string, any[]> = new Map();
@@ -208,15 +211,7 @@ function detectTheme() {
 }
 
 // Initial search
-findVideo();
-detectTheme();
-createUI();
-injectInterceptor();
-setInterval(monitorTimedText, 3000);
-
-let floatingBall: HTMLDivElement | null = null;
-let sidePanel: HTMLDivElement | null = null;
-let isPanelOpen = false;
+// (Moved to bottom)
 
 function createUI() {
   if (document.getElementById('dubsync-container')) return;
@@ -570,3 +565,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 window.addEventListener('beforeunload', () => {
   subtitleCache.clear();
 });
+
+// Initial search
+findVideo();
+detectTheme();
+createUI();
+injectInterceptor();
+setInterval(monitorTimedText, 3000);
