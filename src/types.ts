@@ -3,6 +3,7 @@ export interface Subtitle {
   start: number; // in seconds
   duration: number; // in seconds
   text: string;
+  actualStartTime?: number; // New: record when it actually started playing
 }
 
 export interface SubtitleTrack {
@@ -17,11 +18,10 @@ export type TTSEngine = 'chrome' | 'edge';
 export interface TTSSettings {
   engine: TTSEngine;
   voice: string;
-  rate: number;
   pitch: number;
   volume: number;
   autoSync: boolean; // adjust rate to match duration
-  playbackRate: number; // New: match video playback speed
+  playbackRate: number; // match video playback speed
   showOverlay: boolean;
   overlayOpacity: number;
   overlaySize: number;

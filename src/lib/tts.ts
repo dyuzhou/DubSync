@@ -1,73 +1,101 @@
-import { Subtitle } from "../types";
+import { Subtitle, TTSSettings } from "../types";
+import { EdgeTTS } from 'edge-tts-universal';
 
 export class TTSManager {
-  private synth: SpeechSynthesis;
-  private currentUtterance: SpeechSynthesisUtterance | null = null;
+  private audioCache: Map<string, string> = new Map();
+  private currentAudio: HTMLAudioElement | null = null;
+  private isPrefetching = false;
 
-  constructor() {
-    this.synth = window.speechSynthesis;
+  private isChinese(text: string): boolean {
+    return /[\u4e00-\u9fa5]/.test(text);
   }
 
-  getVoices(): SpeechSynthesisVoice[] {
-    return this.synth.getVoices();
+  private formatProsody(value: number, isRate: boolean = false): string {
+    const percent = Math.round((value - 1) * 100);
+    const sign = percent >= 0 ? '+' : '';
+    return `${sign}${percent}%`;
   }
 
-  speak(subtitle: Subtitle, settings: { voice: string; rate: number; pitch: number; volume: number; autoSync: boolean; playbackRate: number }) {
+  async prefetch(subtitles: Subtitle[], settings: TTSSettings) {
+    if (this.isPrefetching) return;
+    this.isPrefetching = true;
+
+    try {
+      // Only prefetch translated (Chinese) text
+      const toFetch = subtitles.filter(sub => this.isChinese(sub.text) && !this.audioCache.has(sub.id));
+      
+      // Limit prefetch to next 20 subtitles to avoid overwhelming
+      const limitedFetch = toFetch.slice(0, 20);
+
+      for (const sub of limitedFetch) {
+        if (this.audioCache.has(sub.id)) continue;
+        
+        try {
+          const effectiveRate = settings.playbackRate;
+
+          const tts = new EdgeTTS(sub.text, settings.voice, {
+            rate: this.formatProsody(effectiveRate, true),
+            volume: this.formatProsody(settings.volume)
+          });
+          const result = await tts.synthesize();
+          const url = URL.createObjectURL(result.audio);
+          this.audioCache.set(sub.id, url);
+        } catch (e) {
+          console.error(`DubSync: Failed to prefetch TTS for ${sub.id}`, e);
+        }
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    } finally {
+      this.isPrefetching = false;
+    }
+  }
+
+  async speak(subtitle: Subtitle, settings: TTSSettings) {
     this.stop();
 
-    const utterance = new SpeechSynthesisUtterance(subtitle.text);
-    
-    // Find the voice
-    const voices = this.getVoices();
-    const voice = voices.find(v => v.name === settings.voice) || voices[0];
-    if (voice) utterance.voice = voice;
-
-    // Calculate rate
-    // 1. Base rate from user settings
-    let finalRate = settings.rate;
-
-    // 2. Adjust for video playback speed
-    // If video is 2x, TTS must be 2x faster to keep up
-    finalRate *= settings.playbackRate;
-
-    // 3. AutoSync: Adjust to fit subtitle duration
-    if (settings.autoSync && subtitle.duration > 0) {
-      // Adjusted duration based on video playback speed
-      const actualDuration = subtitle.duration / settings.playbackRate;
-      
-      // Estimate characters per second (rough heuristic for Chinese/English)
-      // For English: ~15 chars/sec is normal (rate 1.0)
-      // For Chinese: ~5 chars/sec is normal (rate 1.0)
-      const isChinese = /[\u4e00-\u9fa5]/.test(subtitle.text);
-      const charCount = subtitle.text.length;
-      const baseCharsPerSec = isChinese ? 5 : 15;
-      
-      const estimatedDuration = charCount / baseCharsPerSec;
-      const syncFactor = estimatedDuration / actualDuration;
-      
-      finalRate *= syncFactor;
+    // Only speak translated (Chinese) text
+    if (!this.isChinese(subtitle.text)) {
+      return;
     }
 
-    // Clamp rate between 0.5 and 4.0 (Chrome limits)
-    utterance.rate = Math.max(0.5, Math.min(4.0, finalRate));
-    utterance.pitch = settings.pitch;
-    utterance.volume = settings.volume;
+    let audioUrl = this.audioCache.get(subtitle.id);
 
-    this.currentUtterance = utterance;
-    this.synth.speak(utterance);
+    if (!audioUrl) {
+      try {
+        const effectiveRate = settings.playbackRate;
+
+        const tts = new EdgeTTS(subtitle.text, settings.voice, {
+          rate: this.formatProsody(effectiveRate, true),
+          volume: this.formatProsody(settings.volume)
+        });
+        const result = await tts.synthesize();
+        audioUrl = URL.createObjectURL(result.audio);
+        this.audioCache.set(subtitle.id, audioUrl);
+      } catch (e) {
+        console.error('DubSync: Failed to generate TTS on the fly', e);
+        return;
+      }
+    }
+
+    if (audioUrl) {
+      this.currentAudio = new Audio(audioUrl);
+      this.currentAudio.play().catch(e => console.error('DubSync: Failed to play TTS audio', e));
+    }
   }
 
   stop() {
-    this.synth.cancel();
-    this.currentUtterance = null;
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
+    }
   }
 
-  pause() {
-    this.synth.pause();
-  }
-
-  resume() {
-    this.synth.resume();
+  clearCache() {
+    this.audioCache.forEach(url => URL.revokeObjectURL(url));
+    this.audioCache.clear();
   }
 }
 

@@ -1,11 +1,11 @@
 import React from 'react';
-import { Languages, User, Save, Eye, EyeOff, Type, Sun, VolumeX } from 'lucide-react';
+import { Languages, User, Save, Eye, EyeOff, Type, Sun, VolumeX, FastForward, Timer } from 'lucide-react';
 import { SubtitleTrack, TTSSettings } from '../types';
 
 interface ControlsProps {
   settings: TTSSettings;
   onSettingsChange: (settings: TTSSettings) => void;
-  voices: SpeechSynthesisVoice[];
+  voices: any[];
   tracks: SubtitleTrack[];
   selectedTrackId: string;
   onTrackChange: (trackId: string) => void;
@@ -24,7 +24,7 @@ export const Controls: React.FC<ControlsProps> = ({
   isDark
 }) => {
   return (
-    <div className={`${isDark ? 'bg-[#1e1e1e] border-gray-800' : 'bg-white border-gray-200'} border rounded-xl p-4 shadow-sm space-y-5`}>
+    <div className={`${isDark ? 'bg-[#1e1e1e] border-gray-800' : 'bg-white border-gray-200'} border rounded-xl p-4 shadow-sm space-y-5 shrink-0`}>
       {/* Language Selection */}
       <div className="space-y-2">
         <label className={`text-[11px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
@@ -63,7 +63,7 @@ export const Controls: React.FC<ControlsProps> = ({
         >
           {voices.map(voice => (
             <option key={voice.name} value={voice.name}>
-              {voice.name}
+              {voice.displayName || voice.name}
             </option>
           ))}
         </select>
@@ -71,6 +71,16 @@ export const Controls: React.FC<ControlsProps> = ({
 
       {/* Overlay Settings */}
       <div className="pt-2 border-t border-gray-200 dark:border-gray-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <label className={`text-[11px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
+            <Timer size={14} className="text-blue-500" />
+            朗读速度跟随视频 ({settings.playbackRate.toFixed(2)}x)
+          </label>
+          <div className={`text-[10px] font-mono ${isDark ? 'text-blue-400 bg-blue-900/20' : 'text-blue-600 bg-blue-50'} px-2 py-1 rounded border border-blue-500/20`}>
+            SYNCED
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
           <label className={`text-[11px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
             <Eye size={14} className="text-blue-500" />

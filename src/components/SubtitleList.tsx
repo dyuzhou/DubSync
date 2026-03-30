@@ -9,13 +9,25 @@ interface SubtitleListProps {
 }
 
 export const SubtitleList: React.FC<SubtitleListProps> = ({ subtitles, currentTime, isDark }) => {
+  const activeRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (activeRef.current) {
+      activeRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [currentTime]);
+
   return (
-    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+    <div className="space-y-3 h-full overflow-y-auto pr-2 custom-scrollbar">
       {subtitles.map((sub) => {
         const isActive = currentTime >= sub.start && currentTime < sub.start + sub.duration;
         return (
           <motion.div 
             key={sub.id}
+            ref={isActive ? activeRef : null}
             initial={false}
             animate={{ 
               backgroundColor: isActive 
@@ -28,9 +40,16 @@ export const SubtitleList: React.FC<SubtitleListProps> = ({ subtitles, currentTi
             className={`p-3 rounded-lg border text-xs transition-all ${isDark ? 'border-gray-800' : 'border-gray-100'}`}
           >
             <div className="flex justify-between items-center mb-1.5">
-              <span className={`text-[9px] font-mono ${isDark ? 'text-gray-500 bg-gray-800' : 'text-gray-400 bg-gray-100'} px-1.5 py-0.5 rounded`}>
-                {formatTime(sub.start)}
-              </span>
+              <div className="flex gap-2">
+                <span className={`text-[9px] font-mono ${isDark ? 'text-gray-500 bg-gray-800' : 'text-gray-400 bg-gray-100'} px-1.5 py-0.5 rounded`}>
+                  {formatTime(sub.start)}
+                </span>
+                {sub.actualStartTime !== undefined && (
+                  <span className={`text-[9px] font-mono ${isDark ? 'text-blue-400/50 bg-blue-900/20' : 'text-blue-500/50 bg-blue-50/50'} px-1.5 py-0.5 rounded border border-blue-500/10`}>
+                    实际: {formatTime(sub.actualStartTime)}
+                  </span>
+                )}
+              </div>
               {isActive && (
                 <span className="text-[9px] font-bold text-blue-500 flex items-center gap-1">
                   <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse" />
