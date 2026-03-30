@@ -199,7 +199,8 @@ function setupListeners() {
 
 function detectTheme() {
   const isDark = document.documentElement.hasAttribute('dark') || 
-                 (document.body && document.body.classList.contains('dark')) ||
+                 document.documentElement.classList.contains('dark') ||
+                 (document.body && (document.body.hasAttribute('dark') || document.body.classList.contains('dark'))) ||
                  window.matchMedia('(prefers-color-scheme: dark)').matches;
   
   if (sidePanel) {
@@ -210,6 +211,23 @@ function detectTheme() {
     type: 'YOUTUBE_THEME_CHANGE',
     isDark
   });
+}
+
+const themeObserver = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    if (mutation.type === 'attributes' && (mutation.attributeName === 'dark' || mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+      detectTheme();
+    }
+  }
+});
+
+function setupThemeObserver() {
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['dark', 'class', 'style'] });
+  if (document.body) {
+    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['dark', 'class', 'style'] });
+  }
+  // Listen for system theme changes
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', detectTheme);
 }
 
 // Initial search
@@ -288,7 +306,7 @@ function createUI() {
       height: 100%;
       border: none;
     }
-    .dark #side-panel {
+    #side-panel.dark {
       background: #0f0f0f;
       color: white;
     }
@@ -367,6 +385,9 @@ function createUI() {
       floatingBall?.style.setProperty('transform', 'translateX(0)');
     }
   }
+
+  // Initial detect theme for the new UI
+  detectTheme();
 }
 
 // Intercept timedtext API parameters by monitoring script tags and global variables
@@ -496,6 +517,12 @@ window.addEventListener('message', (event) => {
   if (event.data.type === 'SET_YOUTUBE_RATE' && videoElement) {
     videoElement.playbackRate = event.data.rate;
   }
+  if (event.data.type === 'SET_YOUTUBE_VOLUME' && videoElement) {
+    videoElement.volume = event.data.volume;
+  }
+  if (event.data.type === 'SET_YOUTUBE_MUTE' && videoElement) {
+    videoElement.muted = event.data.muted;
+  }
   if (event.data.type === 'DUB_SUBTITLE_UPDATE') {
     updateOverlay(event.data.text, event.data.settings);
   }
@@ -516,6 +543,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     if (message.type === 'SET_YOUTUBE_RATE' && videoElement) {
       videoElement.playbackRate = message.rate;
     }
+    if (message.type === 'SET_YOUTUBE_VOLUME' && videoElement) {
+      videoElement.volume = message.volume;
+    }
+    if (message.type === 'SET_YOUTUBE_MUTE' && videoElement) {
+      videoElement.muted = message.muted;
+    }
     if (message.type === 'DUB_SUBTITLE_UPDATE') {
       updateOverlay(message.text, message.settings);
     }
@@ -527,6 +560,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     }
     if (message.type === 'REFRESH_CAPTIONS') {
       getYoutubeCaptions();
+      detectTheme();
     }
     return true;
   });
@@ -539,6 +573,7 @@ window.addEventListener('beforeunload', () => {
 
 // Initial search
 findVideo();
+setupThemeObserver();
 detectTheme();
 createUI();
 setInterval(monitorTimedText, 3000);

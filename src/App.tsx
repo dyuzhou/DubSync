@@ -18,7 +18,9 @@ export default function App() {
   const [selectedTrackId, setSelectedTrackId] = useState<string>('');
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => 
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
   const [settings, setSettings] = useState<TTSSettings>(() => {
     const saved = localStorage.getItem('vidpilot_settings');
     if (saved) {
@@ -40,6 +42,7 @@ export default function App() {
       overlayOpacity: 0.8,
       overlaySize: 24,
       showPopupList: false,
+      muteOriginal: true,
     };
   });
 
@@ -48,6 +51,10 @@ export default function App() {
   useEffect(() => {
     sendMessage({ type: 'REFRESH_CAPTIONS' });
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark);
+  }, [isDark]);
 
   useEffect(() => {
     const cleanup = addMessageListener((message) => {
@@ -187,6 +194,21 @@ export default function App() {
     }
   }, [currentTime, isPlaying, selectedTrackId, tracks, settings]);
 
+  useEffect(() => {
+    if (selectedTrackId && settings.muteOriginal) {
+      sendMessage({ type: 'SET_YOUTUBE_MUTE', muted: true });
+    } else {
+      sendMessage({ type: 'SET_YOUTUBE_MUTE', muted: false });
+    }
+    
+    // Cleanup: unmute when component unmounts or setting changes
+    return () => {
+      if (settings.muteOriginal) {
+        sendMessage({ type: 'SET_YOUTUBE_MUTE', muted: false });
+      }
+    };
+  }, [selectedTrackId, settings.muteOriginal]);
+
   const saveSettings = () => {
     localStorage.setItem('vidpilot_settings', JSON.stringify(settings));
     localStorage.setItem('vidpilot_track_id', selectedTrackId);
@@ -200,7 +222,7 @@ export default function App() {
   const selectedTrack = tracks.find(t => t.id === selectedTrackId);
 
   return (
-    <div className={`w-full max-h-[600px] overflow-y-auto custom-scrollbar ${isDark ? 'bg-[#0f0f0f]' : 'bg-[#f8f9fb]'} flex flex-col py-4 px-4 transition-colors duration-300`}>
+    <div className={`w-full max-h-[600px] overflow-y-auto custom-scrollbar flex flex-col py-4 px-4 transition-colors duration-300`}>
       <div className="w-full space-y-4">
         {/* Compact Header */}
         <div className="flex items-center justify-between">
@@ -242,16 +264,25 @@ export default function App() {
 
           {/* Subtitle List Area - Conditional */}
           {settings.showPopupList && (
-            <div className={`${isDark ? 'bg-[#1e1e1e] border-gray-800' : 'bg-white border-gray-200'} border rounded-xl p-3 shadow-sm`}>
-              <div className="flex items-center gap-2 text-gray-400 mb-3">
-                <Youtube size={12} />
-                <span className="text-[9px] font-bold uppercase tracking-widest">实时字幕流</span>
+            <div className={`flex-1 min-h-0 flex flex-col ${isDark ? 'bg-[#1e1e1e] border-gray-800' : 'bg-white border-gray-200'} border rounded-xl shadow-sm overflow-hidden`}>
+              <div className={`flex items-center justify-between px-3 py-2 border-b ${isDark ? 'border-gray-800 bg-[#252525]' : 'border-gray-100 bg-gray-50'}`}>
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Youtube size={12} />
+                  <span className="text-[9px] font-bold uppercase tracking-widest">实时字幕流</span>
+                </div>
+                {selectedTrack && (
+                  <span className={`text-[9px] font-medium ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {selectedTrack.language}
+                  </span>
+                )}
               </div>
-              <SubtitleList 
-                subtitles={selectedTrack?.subtitles || []}
-                currentTime={currentTime}
-                isDark={isDark}
-              />
+              <div className="flex-1 overflow-hidden p-3">
+                <SubtitleList 
+                  subtitles={selectedTrack?.subtitles || []}
+                  currentTime={currentTime}
+                  isDark={isDark}
+                />
+              </div>
             </div>
           )}
         </div>

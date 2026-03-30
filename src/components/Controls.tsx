@@ -1,5 +1,5 @@
 import React from 'react';
-import { Languages, User, Save, Eye, EyeOff, Type, Sun } from 'lucide-react';
+import { Languages, User, Save, Eye, EyeOff, Type, Sun, VolumeX } from 'lucide-react';
 import { SubtitleTrack, TTSSettings } from '../types';
 
 interface ControlsProps {
@@ -94,6 +94,19 @@ export const Controls: React.FC<ControlsProps> = ({
             className={`w-10 h-5 rounded-full transition-colors relative ${settings.showPopupList ? 'bg-blue-600' : 'bg-gray-300'}`}
           >
             <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${settings.showPopupList ? 'left-6' : 'left-1'}`} />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label className={`text-[11px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
+            <VolumeX size={14} className="text-blue-500" />
+            消除原声 (Mute Original)
+          </label>
+          <button 
+            onClick={() => onSettingsChange({ ...settings, muteOriginal: !settings.muteOriginal })}
+            className={`w-10 h-5 rounded-full transition-colors relative ${settings.muteOriginal ? 'bg-blue-600' : 'bg-gray-300'}`}
+          >
+            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${settings.muteOriginal ? 'left-6' : 'left-1'}`} />
           </button>
         </div>
 

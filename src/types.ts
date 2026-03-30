@@ -26,4 +26,5 @@ export interface TTSSettings {
   overlayOpacity: number;
   overlaySize: number;
   showPopupList: boolean;
+  muteOriginal: boolean;
 }

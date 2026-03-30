@@ -5,12 +5,25 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+:root {
+  --bg-color: #f8f9fb;
+  --text-color: #111827;
+}
+
+:root.dark {
+  --bg-color: #0f0f0f;
+  --text-color: #f9fafb;
+}
+
 body {
-  @apply bg-[#f8f9fb] text-gray-900 antialiased;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  @apply antialiased;
   font-family: var(--font-sans);
   width: 400px;
   margin: 0;
   overflow: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
