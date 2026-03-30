@@ -32,7 +32,7 @@ export default function App() {
     }
     return {
       engine: 'edge',
-      voice: 'zh-CN-XiaoxiaoNeural',
+      voice: '',
       pitch: 1.0,
       volume: 1.0,
       autoSync: true,
@@ -147,26 +147,32 @@ export default function App() {
   }, [selectedTrackId, currentVideoId, settings]);
 
   useEffect(() => {
-    // Define Edge TTS voices
-    const edgeVoices = [
-      { name: 'zh-CN-XiaoxiaoNeural', displayName: 'Microsoft Xiaoxiao - Chinese (Simplified)' },
-      { name: 'zh-CN-YunxiNeural', displayName: 'Microsoft Yunxi - Chinese (Simplified)' },
-      { name: 'zh-CN-YunjianNeural', displayName: 'Microsoft Yunjian - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaoyiNeural', displayName: 'Microsoft Xiaoyi - Chinese (Simplified)' },
-      { name: 'zh-CN-YunyangNeural', displayName: 'Microsoft Yunyang - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaochenNeural', displayName: 'Microsoft Xiaochen - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaohanNeural', displayName: 'Microsoft Xiaohan - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaomengNeural', displayName: 'Microsoft Xiaomeng - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaomoNeural', displayName: 'Microsoft Xiaomo - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaoquiNeural', displayName: 'Microsoft Xiaoqui - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaoruiNeural', displayName: 'Microsoft Xiaorui - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaoshuangNeural', displayName: 'Microsoft Xiaoshuang - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaoxuanNeural', displayName: 'Microsoft Xiaoxuan - Chinese (Simplified)' },
-      { name: 'zh-CN-XiaozhenNeural', displayName: 'Microsoft Xiaozhen - Chinese (Simplified)' },
-      { name: 'zh-HK-HiuGaaiNeural', displayName: 'Microsoft HiuGaai - Chinese (Hong Kong)' },
-      { name: 'zh-TW-HsiaoChenNeural', displayName: 'Microsoft HsiaoChen - Chinese (Taiwan)' },
-    ];
-    setVoices(edgeVoices);
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    const loadVoices = () => {
+      const browserVoices = window.speechSynthesis.getVoices();
+      if (!browserVoices || browserVoices.length === 0) return;
+
+      const voiceOptions = browserVoices.map(voice => ({
+        name: voice.name,
+        displayName: `${voice.name} (${voice.lang})`
+      }));
+
+      setVoices(voiceOptions);
+      setSettings(prev => {
+        if (prev.voice && voiceOptions.some(v => v.name === prev.voice)) {
+          return prev;
+        }
+        const defaultVoice = voiceOptions.find(v => v.displayName.toLowerCase().includes('zh')) || voiceOptions[0];
+        return { ...prev, voice: defaultVoice?.name || '' };
+      });
+    };
+
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+    };
   }, []);
 
   useEffect(() => {
