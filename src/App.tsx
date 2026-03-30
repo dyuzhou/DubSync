@@ -32,7 +32,7 @@ export default function App() {
     }
     return {
       engine: 'edge',
-      voice: '',
+      voice: 'yunjian',
       pitch: 1.0,
       volume: 1.0,
       autoSync: true,
@@ -46,6 +46,7 @@ export default function App() {
   });
 
   const lastSubtitleId = useRef<string | null>(null);
+  const lastSubtitleRate = useRef<number>(1.0);
 
   useEffect(() => {
     sendMessage({ type: 'REFRESH_CAPTIONS' });
@@ -163,6 +164,10 @@ export default function App() {
         if (prev.voice && voiceOptions.some(v => v.name === prev.voice)) {
           return prev;
         }
+        const yunjianVoice = voiceOptions.find(v => v.name.toLowerCase().includes('yunjian') || v.displayName.toLowerCase().includes('yunjian'));
+        if (yunjianVoice) {
+          return { ...prev, voice: yunjianVoice.name };
+        }
         const defaultVoice = voiceOptions.find(v => v.displayName.toLowerCase().includes('zh')) || voiceOptions[0];
         return { ...prev, voice: defaultVoice?.name || '' };
       });
@@ -200,21 +205,30 @@ export default function App() {
     }
 
     if (activeSubtitle) {
-      if (activeSubtitle.id !== lastSubtitleId.current) {
-        lastSubtitleId.current = activeSubtitle.id;
-        
-        // Record actual start time
-        setTracks(prev => prev.map(t => {
-          if (t.id === selectedTrackId) {
-            return {
-              ...t,
-              subtitles: t.subtitles.map(s => 
-                s.id === activeSubtitle.id ? { ...s, actualStartTime: currentTime } : s
-              )
-            };
-          }
-          return t;
-        }));
+      const isNewSubtitle = activeSubtitle.id !== lastSubtitleId.current;
+      const rateChanged = !isNewSubtitle && settings.playbackRate !== lastSubtitleRate.current;
+
+      if (isNewSubtitle || rateChanged) {
+        if (isNewSubtitle) {
+          lastSubtitleId.current = activeSubtitle.id;
+        }
+
+        lastSubtitleRate.current = settings.playbackRate;
+
+        // Record actual start time when the current subtitle is newly activated
+        if (isNewSubtitle) {
+          setTracks(prev => prev.map(t => {
+            if (t.id === selectedTrackId) {
+              return {
+                ...t,
+                subtitles: t.subtitles.map(s => 
+                  s.id === activeSubtitle.id ? { ...s, actualStartTime: currentTime } : s
+                )
+              };
+            }
+            return t;
+          }));
+        }
 
         const activeIndex = currentTrack.subtitles.findIndex((sub: any) => sub.id === activeSubtitle.id);
         const nextSubtitle = activeIndex >= 0 ? currentTrack.subtitles[activeIndex + 1] : null;
@@ -234,6 +248,9 @@ export default function App() {
           }
         }
 
+        if (rateChanged) {
+          ttsManager.stop();
+        }
         ttsManager.speak(activeSubtitle, settings, adjustedRate);
       }
     } else {
