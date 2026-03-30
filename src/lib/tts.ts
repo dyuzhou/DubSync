@@ -2,6 +2,9 @@ import { Subtitle, TTSSettings } from "../types";
 
 export class TTSManager {
   private currentUtterance: SpeechSynthesisUtterance | null = null;
+  private pendingSubtitle: Subtitle | null = null;
+  private pendingSettings: TTSSettings | null = null;
+  private pendingRateOverride: number | undefined = undefined;
 
   private isChinese(text: string): boolean {
     return /[\u4e00-\u9fa5]/.test(text);
@@ -27,7 +30,7 @@ export class TTSManager {
     return voices.find(voice => voice.lang.toLowerCase().startsWith('en')) || voices[0];
   }
 
-  private speakWithBrowserTTS(text: string, settings: TTSSettings) {
+  private speakWithBrowserTTS(text: string, settings: TTSSettings, rateOverride?: number) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       throw new Error('Browser SpeechSynthesis is not available in this environment.');
     }
@@ -37,7 +40,7 @@ export class TTSManager {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.isChinese(text) ? 'zh-CN' : 'en-US';
     utterance.volume = settings.volume;
-    utterance.rate = Math.max(0.1, Math.min(settings.playbackRate, 2));
+    utterance.rate = Math.max(0.1, Math.min(rateOverride ?? settings.playbackRate, 2));
     utterance.pitch = Math.max(0.1, Math.min(settings.pitch, 2));
 
     const browserVoice = this.getBrowserVoice(text, settings);
@@ -48,6 +51,15 @@ export class TTSManager {
     utterance.onend = () => {
       if (this.currentUtterance === utterance) {
         this.currentUtterance = null;
+      }
+      if (this.pendingSubtitle && this.pendingSettings) {
+        const nextSubtitle = this.pendingSubtitle;
+        const nextSettings = this.pendingSettings;
+        const nextRate = this.pendingRateOverride;
+        this.pendingSubtitle = null;
+        this.pendingSettings = null;
+        this.pendingRateOverride = undefined;
+        this.speak(nextSubtitle, nextSettings, nextRate);
       }
     };
     utterance.onerror = (event) => {
@@ -63,15 +75,20 @@ export class TTSManager {
     return;
   }
 
-  async speak(subtitle: Subtitle, settings: TTSSettings) {
-    this.stop();
-
+  async speak(subtitle: Subtitle, settings: TTSSettings, rateOverride?: number) {
     if (!this.isChinese(subtitle.text)) {
       return;
     }
 
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking && this.currentUtterance) {
+      this.pendingSubtitle = subtitle;
+      this.pendingSettings = settings;
+      this.pendingRateOverride = rateOverride;
+      return;
+    }
+
     try {
-      this.speakWithBrowserTTS(subtitle.text, settings);
+      this.speakWithBrowserTTS(subtitle.text, settings, rateOverride);
     } catch (e) {
       console.error('DubSync: Failed to speak with browser TTS', e);
     }
@@ -82,6 +99,9 @@ export class TTSManager {
       window.speechSynthesis.cancel();
       this.currentUtterance = null;
     }
+    this.pendingSubtitle = null;
+    this.pendingSettings = null;
+    this.pendingRateOverride = undefined;
   }
 
   clearCache() {

@@ -216,7 +216,25 @@ export default function App() {
           return t;
         }));
 
-        ttsManager.speak(activeSubtitle, settings);
+        const activeIndex = currentTrack.subtitles.findIndex((sub: any) => sub.id === activeSubtitle.id);
+        const nextSubtitle = activeIndex >= 0 ? currentTrack.subtitles[activeIndex + 1] : null;
+        let adjustedRate: number | undefined;
+
+        if (settings.autoSync && nextSubtitle) {
+          const subtitleEnd = activeSubtitle.start + activeSubtitle.duration;
+          const timeToNextStart = nextSubtitle.start - currentTime;
+          const remainingSchedule = subtitleEnd - currentTime;
+
+          if (subtitleEnd > nextSubtitle.start && timeToNextStart > 0 && remainingSchedule > 0) {
+            const overlap = subtitleEnd - nextSubtitle.start;
+            const speedFactor = 1 + overlap / Math.max(0.1, remainingSchedule);
+            adjustedRate = Math.min(2, settings.playbackRate * speedFactor);
+          } else if (subtitleEnd > nextSubtitle.start && timeToNextStart <= 0) {
+            adjustedRate = 2;
+          }
+        }
+
+        ttsManager.speak(activeSubtitle, settings, adjustedRate);
       }
     } else {
       lastSubtitleId.current = null;
