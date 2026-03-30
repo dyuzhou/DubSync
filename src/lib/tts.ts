@@ -5,7 +5,6 @@ export class TTSManager {
   private pendingSubtitle: Subtitle | null = null;
   private pendingSettings: TTSSettings | null = null;
   private pendingRateOverride: number | undefined = undefined;
-  private readonly baseRateMultiplier = 2.5;
   private readonly maxRate = 4.0;
 
   private isChinese(text: string): boolean {
@@ -33,7 +32,7 @@ export class TTSManager {
   }
 
   private getEffectiveRate(settings: TTSSettings, rateOverride?: number) {
-    const baseRate = rateOverride ?? settings.playbackRate * this.baseRateMultiplier;
+    const baseRate = rateOverride ?? settings.playbackRate;
     return Math.max(0.1, Math.min(baseRate, this.maxRate));
   }
 

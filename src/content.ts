@@ -11,6 +11,11 @@ let isPanelOpen = false;
 // Cache for subtitles (max 10 videos)
 const subtitleCache: Map<string, any[]> = new Map();
 
+const isValidSubtitleText = (text: string) => {
+  const trimmed = (text || '').trim();
+  return trimmed.length > 0 && (/[A-Za-z0-9\u4e00-\u9fa5]/.test(trimmed));
+};
+
 function createOverlay() {
   if (subtitleOverlay && document.contains(subtitleOverlay)) return;
   
@@ -169,7 +174,8 @@ async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: strin
           start: e.tStartMs / 1000,
           duration: e.dDurationMs / 1000,
           text: e.segs.map((s: any) => s.utf8).join('').trim()
-        }));
+        }))
+        .filter((sub: any) => isValidSubtitleText(sub.text));
 
       // Manage cache (max 10)
       if (subtitleCache.size >= 10) {
@@ -508,7 +514,8 @@ window.addEventListener('message', (event) => {
                 start: e.tStartMs / 1000,
                 duration: e.dDurationMs / 1000,
                 text: e.segs.map((s: any) => s.utf8).join('')
-              }));
+              }))
+              .filter((sub: any) => isValidSubtitleText(sub.text));
           }
         } else if (text.trim().startsWith('<')) {
           // XML format
@@ -520,7 +527,8 @@ window.addEventListener('message', (event) => {
             start: parseFloat(node.getAttribute('start') || '0'),
             duration: parseFloat(node.getAttribute('dur') || '0'),
             text: node.textContent || ''
-          }));
+          }))
+          .filter((sub: any) => isValidSubtitleText(sub.text));
         }
 
         if (subtitles.length > 0) {
