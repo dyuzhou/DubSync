@@ -50,6 +50,22 @@ export const Controls: React.FC<ControlsProps> = ({
         </div>
       </div>
 
+      {/* TTS Engine Selection */}
+      <div className="space-y-2">
+        <label className={`text-[11px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
+          <FastForward size={14} className="text-blue-500" />
+          TTS 引擎 (Engine)
+        </label>
+        <select
+          value={settings.engine}
+          onChange={(e) => onSettingsChange({ ...settings, engine: e.target.value as 'edge' | 'chrome' })}
+          className={`w-full ${isDark ? 'bg-[#2d2d2d] border-gray-700 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'} rounded-lg px-3 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all`}
+        >
+          <option value="edge">Edge TTS (云端)</option>
+          <option value="chrome">Chrome TTS (浏览器内置)</option>
+        </select>
+      </div>
+
       {/* Voice Selection */}
       <div className="space-y-2">
         <label className={`text-[11px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
