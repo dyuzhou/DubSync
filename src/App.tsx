@@ -35,11 +35,14 @@ export default function App() {
       volume: 1.0,
       autoSync: true,
       playbackRate: 1.0,
+      showOverlay: true,
+      overlayOpacity: 0.8,
+      overlaySize: 24,
+      showPopupList: false,
     };
   });
 
   const lastSubtitleId = useRef<string | null>(null);
-  const videoDuration = 30;
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -89,16 +92,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isPlaying) {
-      ttsManager.stop();
-      return;
-    }
     const currentTrack = tracks.find(t => t.id === selectedTrackId);
     if (!currentTrack) return;
     const activeSubtitle = currentTrack.subtitles.find(
       sub => currentTime >= sub.start && currentTime < sub.start + sub.duration
     );
-    if (activeSubtitle && activeSubtitle.id !== lastSubtitleId.current) {
+    
+    // Update overlay
+    window.postMessage({
+      type: 'DUB_SUBTITLE_UPDATE',
+      text: activeSubtitle?.text || '',
+      settings: {
+        showOverlay: settings.showOverlay,
+        overlayOpacity: settings.overlayOpacity,
+        overlaySize: settings.overlaySize
+      }
+    }, '*');
+
+    if (isPlaying && activeSubtitle && activeSubtitle.id !== lastSubtitleId.current) {
       lastSubtitleId.current = activeSubtitle.id;
       ttsManager.speak(activeSubtitle, settings);
     } else if (!activeSubtitle) {
@@ -115,51 +126,43 @@ export default function App() {
   const selectedTrack = tracks.find(t => t.id === selectedTrackId);
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-[#0f0f0f]' : 'bg-[#f8f9fb]'} flex flex-col items-center py-12 px-4 transition-colors duration-300`}>
-      <div className="w-full max-w-4xl space-y-12">
-        {/* Streamlit-style Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Zap className="text-white" size={20} />
+    <div className={`w-full max-h-[600px] overflow-y-auto custom-scrollbar ${isDark ? 'bg-[#0f0f0f]' : 'bg-[#f8f9fb]'} flex flex-col py-4 px-4 transition-colors duration-300`}>
+      <div className="w-full space-y-4">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Zap className="text-white" size={14} />
             </div>
-            <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} tracking-tight`}>DubSync</h1>
+            <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'} tracking-tight`}>DubSync</h1>
           </div>
-          <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-sm max-w-xl`}>
-            基于 Edge TTS 的 YouTube 视频自动翻译朗读工具。
-            完美适配视频语速，提供最自然的发音体验。
-          </p>
+          <div className="flex items-center gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+            <span className={`text-[9px] font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'} uppercase tracking-tighter`}>
+              {isPlaying ? '正在同步' : '已暂停'}
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-          {/* Controls Sidebar Style */}
-          <div className="md:col-span-1">
-            <Controls 
-              selectedVoice={settings.voice}
-              onVoiceChange={(voice) => setSettings(s => ({ ...s, voice }))}
-              voices={voices}
-              tracks={tracks}
-              selectedTrackId={selectedTrackId}
-              onTrackChange={setSelectedTrackId}
-              onSave={saveSettings}
-              isDark={isDark}
-            />
-          </div>
+        <div className="space-y-4">
+          {/* Controls Area */}
+          <Controls 
+            settings={settings}
+            onSettingsChange={setSettings}
+            voices={voices}
+            tracks={tracks}
+            selectedTrackId={selectedTrackId}
+            onTrackChange={setSelectedTrackId}
+            onSave={saveSettings}
+            isDark={isDark}
+          />
 
-          {/* Main Content Area */}
-          <div className="md:col-span-2 space-y-8">
-            <div className={`${isDark ? 'bg-[#1e1e1e] border-gray-800' : 'bg-white border-gray-200'} border rounded-xl p-6 shadow-sm`}>
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Youtube size={16} />
-                  <span className="text-xs font-bold uppercase tracking-widest">实时字幕流</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-                  <span className={`text-[10px] font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'} uppercase tracking-tighter`}>
-                    {isPlaying ? '正在同步播放' : '已暂停'}
-                  </span>
-                </div>
+          {/* Subtitle List Area - Conditional */}
+          {settings.showPopupList && (
+            <div className={`${isDark ? 'bg-[#1e1e1e] border-gray-800' : 'bg-white border-gray-200'} border rounded-xl p-3 shadow-sm`}>
+              <div className="flex items-center gap-2 text-gray-400 mb-3">
+                <Youtube size={12} />
+                <span className="text-[9px] font-bold uppercase tracking-widest">实时字幕流</span>
               </div>
               <SubtitleList 
                 subtitles={selectedTrack?.subtitles || []}
@@ -167,7 +170,7 @@ export default function App() {
                 isDark={isDark}
               />
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

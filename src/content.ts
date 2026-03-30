@@ -3,11 +3,51 @@
  */
 
 let videoElement: HTMLVideoElement | null = null;
+let subtitleOverlay: HTMLDivElement | null = null;
+
+function createOverlay() {
+  if (subtitleOverlay) return;
+  subtitleOverlay = document.createElement('div');
+  subtitleOverlay.id = 'dubsync-subtitle-overlay';
+  Object.assign(subtitleOverlay.style, {
+    position: 'absolute',
+    bottom: '10%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    color: 'white',
+    padding: '8px 16px',
+    borderRadius: '8px',
+    fontSize: '24px',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    zIndex: '9999',
+    pointerEvents: 'none',
+    display: 'none',
+    maxWidth: '80%',
+    textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+    transition: 'all 0.2s ease'
+  });
+  
+  const container = document.querySelector('#movie_player') || document.body;
+  container.appendChild(subtitleOverlay);
+}
+
+function updateOverlay(text: string, settings: any) {
+  if (!subtitleOverlay) createOverlay();
+  if (subtitleOverlay) {
+    subtitleOverlay.innerText = text;
+    subtitleOverlay.style.display = (settings.showOverlay && text) ? 'block' : 'none';
+    subtitleOverlay.style.fontSize = `${settings.overlaySize || 24}px`;
+    subtitleOverlay.style.opacity = `${settings.overlayOpacity || 1}`;
+  }
+}
 
 function findVideo() {
   videoElement = document.querySelector('video');
   if (videoElement) {
     setupListeners();
+    createOverlay();
   }
 }
 
@@ -73,5 +113,8 @@ observer.observe(document.body, { childList: true, subtree: true });
 window.addEventListener('message', (event) => {
   if (event.data.type === 'SET_YOUTUBE_RATE' && videoElement) {
     videoElement.playbackRate = event.data.rate;
+  }
+  if (event.data.type === 'DUB_SUBTITLE_UPDATE') {
+    updateOverlay(event.data.text, event.data.settings);
   }
 });

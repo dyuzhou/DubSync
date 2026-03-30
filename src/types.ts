@@ -22,4 +22,8 @@ export interface TTSSettings {
   volume: number;
   autoSync: boolean; // adjust rate to match duration
   playbackRate: number; // New: match video playback speed
+  showOverlay: boolean;
+  overlayOpacity: number;
+  overlaySize: number;
+  showPopupList: boolean;
 }

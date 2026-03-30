@@ -8,6 +8,9 @@
 body {
   @apply bg-[#f8f9fb] text-gray-900 antialiased;
   font-family: var(--font-sans);
+  width: 400px;
+  margin: 0;
+  overflow: hidden;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
