@@ -45,7 +45,9 @@ function createOverlay() {
   const container = document.querySelector('.html5-video-container') || 
                     document.querySelector('#movie_player') || 
                     document.body;
-  container.appendChild(subtitleOverlay);
+  if (container) {
+    container.appendChild(subtitleOverlay);
+  }
 }
 
 function updateOverlay(text: string, settings?: any) {
@@ -197,7 +199,7 @@ function setupListeners() {
 
 function detectTheme() {
   const isDark = document.documentElement.hasAttribute('dark') || 
-                 document.body.classList.contains('dark') ||
+                 (document.body && document.body.classList.contains('dark')) ||
                  window.matchMedia('(prefers-color-scheme: dark)').matches;
   
   if (sidePanel) {
@@ -215,6 +217,10 @@ function detectTheme() {
 
 function createUI() {
   if (document.getElementById('dubsync-container')) return;
+  if (!document.body) {
+    // If body is not ready yet, we'll be called again by the MutationObserver
+    return;
+  }
 
   const container = document.createElement('div');
   container.id = 'dubsync-container';
@@ -401,6 +407,11 @@ const observer = new MutationObserver(() => {
     findVideo();
   }
   
+  // Try to create UI if it doesn't exist yet (e.g. body just became available)
+  if (!document.getElementById('dubsync-container') && document.body) {
+    createUI();
+  }
+
   // Update visibility based on videoId
   const container = document.getElementById('dubsync-container');
   if (container) {
@@ -410,7 +421,13 @@ const observer = new MutationObserver(() => {
   detectTheme();
 });
 
-observer.observe(document.body, { childList: true, subtree: true });
+// Start observing
+if (document.body) {
+  observer.observe(document.body, { childList: true, subtree: true });
+} else {
+  // If body is not ready, observe documentElement to catch body creation
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 // Listen for messages from the popup/UI
 window.addEventListener('message', (event) => {
