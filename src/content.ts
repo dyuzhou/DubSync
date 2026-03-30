@@ -136,6 +136,17 @@ async function fetchTrackContent(baseUrl: string, videoId: string, tlang?: strin
     }
 
     const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('DubSync: Received non-JSON response', text.substring(0, 100));
+      throw new Error('Received non-JSON response from YouTube');
+    }
+
     const data = await response.json();
     const events = data.events || [];
     

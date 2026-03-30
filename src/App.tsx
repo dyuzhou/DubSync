@@ -172,25 +172,34 @@ export default function App() {
       }
     });
 
-    if (isPlaying && activeSubtitle && activeSubtitle.id !== lastSubtitleId.current) {
-      lastSubtitleId.current = activeSubtitle.id;
-      
-      // Record actual start time
-      setTracks(prev => prev.map(t => {
-        if (t.id === selectedTrackId) {
-          return {
-            ...t,
-            subtitles: t.subtitles.map(s => 
-              s.id === activeSubtitle.id ? { ...s, actualStartTime: currentTime } : s
-            )
-          };
-        }
-        return t;
-      }));
-
-      ttsManager.speak(activeSubtitle, settings);
-    } else if (!activeSubtitle) {
+    if (!isPlaying) {
+      ttsManager.stop();
       lastSubtitleId.current = null;
+      return;
+    }
+
+    if (activeSubtitle) {
+      if (activeSubtitle.id !== lastSubtitleId.current) {
+        lastSubtitleId.current = activeSubtitle.id;
+        
+        // Record actual start time
+        setTracks(prev => prev.map(t => {
+          if (t.id === selectedTrackId) {
+            return {
+              ...t,
+              subtitles: t.subtitles.map(s => 
+                s.id === activeSubtitle.id ? { ...s, actualStartTime: currentTime } : s
+              )
+            };
+          }
+          return t;
+        }));
+
+        ttsManager.speak(activeSubtitle, settings);
+      }
+    } else {
+      lastSubtitleId.current = null;
+      ttsManager.stop();
     }
   }, [currentTime, isPlaying, selectedTrackId, tracks, settings]);
 
