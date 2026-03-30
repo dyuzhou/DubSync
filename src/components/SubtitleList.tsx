@@ -6,9 +6,10 @@ interface SubtitleListProps {
   subtitles: Subtitle[];
   currentTime: number;
   isDark?: boolean;
+  onPlaySubtitle: (subtitle: Subtitle) => void;
 }
 
-export const SubtitleList: React.FC<SubtitleListProps> = ({ subtitles, currentTime, isDark }) => {
+export const SubtitleList: React.FC<SubtitleListProps> = ({ subtitles, currentTime, isDark, onPlaySubtitle }) => {
   const activeRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -39,8 +40,8 @@ export const SubtitleList: React.FC<SubtitleListProps> = ({ subtitles, currentTi
             }}
             className={`p-3 rounded-lg border text-xs transition-all ${isDark ? 'border-gray-800' : 'border-gray-100'}`}
           >
-            <div className="flex justify-between items-center mb-1.5">
-              <div className="flex gap-2">
+            <div className="flex justify-between items-center mb-1.5 gap-2">
+              <div className="flex gap-2 items-center">
                 <span className={`text-[9px] font-mono ${isDark ? 'text-gray-500 bg-gray-800' : 'text-gray-400 bg-gray-100'} px-1.5 py-0.5 rounded`}>
                   {formatTime(sub.start)}
                 </span>
@@ -50,12 +51,21 @@ export const SubtitleList: React.FC<SubtitleListProps> = ({ subtitles, currentTi
                   </span>
                 )}
               </div>
-              {isActive && (
-                <span className="text-[9px] font-bold text-blue-500 flex items-center gap-1">
-                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse" />
-                  READING
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {isActive && (
+                  <span className="text-[9px] font-bold text-blue-500 flex items-center gap-1">
+                    <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse" />
+                    READING
+                  </span>
+                )}
+                <button
+                  onClick={() => onPlaySubtitle(sub)}
+                  className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${isDark ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  title="测试朗读"
+                >
+                  <span className="text-sm">🔊</span>
+                </button>
+              </div>
             </div>
             <p className={`leading-snug font-medium ${
               isActive 

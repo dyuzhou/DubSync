@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Controls } from './components/Controls';
 import { SubtitleList } from './components/SubtitleList';
-import { SubtitleTrack, TTSSettings } from './types';
+import { Subtitle, SubtitleTrack, TTSSettings } from './types';
 import { ttsManager } from './lib/tts';
 import { Youtube, Zap } from 'lucide-react';
 import { addMessageListener, sendMessage } from './lib/messaging';
@@ -294,6 +294,11 @@ export default function App() {
 
   const selectedTrack = tracks.find(t => t.id === selectedTrackId);
 
+  const handlePlaySubtitle = (subtitle: Subtitle) => {
+    ttsManager.stop();
+    ttsManager.speak(subtitle, settings, settings.playbackRate * 3);
+  };
+
   return (
     <div className={`w-full h-screen overflow-hidden flex flex-col py-4 px-4 transition-colors duration-300`}>
       <div className="flex-1 flex flex-col min-h-0 space-y-4">
@@ -354,6 +359,7 @@ export default function App() {
                   subtitles={selectedTrack?.subtitles || []}
                   currentTime={currentTime}
                   isDark={isDark}
+                  onPlaySubtitle={handlePlaySubtitle}
                 />
               </div>
             </div>
