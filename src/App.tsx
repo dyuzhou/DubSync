@@ -32,7 +32,7 @@ export default function App() {
     }
     return {
       engine: 'edge',
-      voice: 'yunjian',
+      voice: 'zh-CN-YunjianNeural',
       pitch: 1.0,
       volume: 1.0,
       autoSync: true,
@@ -169,11 +169,24 @@ export default function App() {
         if (prev.voice && voiceOptions.some(v => v.name === prev.voice)) {
           return prev;
         }
-        const yunjianVoice = voiceOptions.find(v => v.name.toLowerCase().includes('yunjian') || v.displayName.toLowerCase().includes('yunjian'));
+
+        const yunjianVoice = voiceOptions.find(v => {
+          const name = v.name.toLowerCase();
+          const label = v.displayName.toLowerCase();
+          return name.includes('yunjian') || label.includes('yunjian') || name === 'zh-cn-yunjianneural';
+        });
         if (yunjianVoice) {
           return { ...prev, voice: yunjianVoice.name };
         }
-        const defaultVoice = voiceOptions.find(v => v.displayName.toLowerCase().includes('zh')) || voiceOptions[0];
+
+        const chinese = voiceOptions.find(v => {
+          const name = v.name.toLowerCase();
+          const label = v.displayName.toLowerCase();
+          return name.includes('zh') || label.includes('zh');
+        });
+
+        const defaultVoice = chinese || voiceOptions[0];
+
         return { ...prev, voice: defaultVoice?.name || '' };
       });
     };

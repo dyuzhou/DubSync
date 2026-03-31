@@ -187,11 +187,13 @@ export function processSubtitlesForTTS(track: SubtitleTrack): SubtitleTrack {
     if (!text) continue;
 
     const sentences = text.split(TTS_PROCESS_CONFIG.splitPunctuation).filter(s => s.trim());
+    const segments = sentences.flatMap(sentence => splitLongSentence(sentence, 60));
+    if (segments.length === 0) continue;
 
-    const timePerSentence = sub.duration / sentences.length;
+    const timePerSentence = sub.duration / segments.length;
 
-    sentences.forEach((sentence, index) => {
-      const cleanText = cleanTextForTTS(sentence);
+    segments.forEach((segment, index) => {
+      const cleanText = cleanTextForTTS(segment);
       if (!cleanText) return;
 
       finalSubs.push({
@@ -220,6 +222,51 @@ function cleanTextForTTS(text: string): string {
     .trim()
     .replace(TTS_PROCESS_CONFIG.neutralPunctuation, '')
     .replace(/\s+/g, '');
+}
+
+function splitLongSentence(sentence: string, maxLength: number): string[] {
+  if (!sentence) return [];
+  if (sentence.length <= maxLength) return [sentence];
+
+  const primitiveSegments = sentence.split(TTS_PROCESS_CONFIG.splitPunctuation).filter(Boolean);
+
+  const result: string[] = [];
+  let bucket = '';
+
+  const flushBucket = () => {
+    if (bucket) {
+      result.push(bucket);
+      bucket = '';
+    }
+  };
+
+  for (const segment of primitiveSegments) {
+    if (!segment) continue;
+    if ((bucket + segment).length <= maxLength) {
+      bucket += segment;
+      continue;
+    }
+
+    if (bucket) {
+      flushBucket();
+    }
+
+    if (segment.length <= maxLength) {
+      bucket = segment;
+      continue;
+    }
+
+    // 单个段落仍超过 maxLength，直接按字符切分（保证不会无限大）
+    let remaining = segment;
+    while (remaining.length > maxLength) {
+      result.push(remaining.substring(0, maxLength));
+      remaining = remaining.substring(maxLength);
+    }
+    bucket = remaining;
+  }
+
+  flushBucket();
+  return result;
 }
 
 /**
