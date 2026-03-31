@@ -1,4 +1,4 @@
-import { Subtitle } from '../types';
+import { Subtitle, SubtitleTrack } from '../types';
 
 const sentenceSplitRegex = /[^。！？!?；;，,]+[。！？!?；;，,]?/g;
 const sentenceEndRegex = /[。！？!?；;]$/;
@@ -130,3 +130,102 @@ export function splitSubtitlesBySentence(subtitles: Subtitle[]): Subtitle[] {
   }
   return result;
 }
+
+// -----------------------------------------------------------------------------
+// 新增TTS优化处理，用于减少断句不自然和延迟问题
+// -----------------------------------------------------------------------------
+
+const TTS_PROCESS_CONFIG = {
+  // 短字幕阈值：≤2个字自动合并（含中文、英文字符均可）
+  shortTextThreshold: 2,
+  // 无语气标点（TTS请求时移除）
+  neutralPunctuation: /[，。；：、]/g,
+  // 语气标点（TTS请求时保留）
+  emotionPunctuation: /[！？…]/g,
+  // 分句标点：用于分割完整语句
+  splitPunctuation: /(?<=[！？。；：…])/g,
+};
+
+/**
+ * 核心：字幕智能分句 + TTS预处理
+ * @param track 原始字幕轨道
+ * @returns 处理后适配TTS的字幕轨道
+ */
+export function processSubtitlesForTTS(track: SubtitleTrack): SubtitleTrack {
+  if (!track.subtitles.length) return track;
+
+  const processedSubs: Subtitle[] = [];
+  const originalSubs = [...track.subtitles];
+
+  // 第一步：合并极短字幕（1-2个字）
+  for (let i = 0; i < originalSubs.length; i++) {
+    let current = originalSubs[i];
+    const currentText = current.text.trim();
+
+    if (currentText.length <= TTS_PROCESS_CONFIG.shortTextThreshold) {
+      if (i + 1 < originalSubs.length) {
+        originalSubs[i + 1].text = currentText + originalSubs[i + 1].text;
+        originalSubs[i + 1].start = current.start;
+        originalSubs[i + 1].duration += current.duration;
+      } else if (processedSubs.length > 0) {
+        const last = processedSubs[processedSubs.length - 1];
+        last.text += currentText;
+        last.duration += current.duration;
+      }
+      continue;
+    }
+
+    processedSubs.push(current);
+  }
+
+  // 第二步：按标点智能分句 + 清理标点（适配TTS）
+  const finalSubs: Subtitle[] = [];
+  let subtitleIdCounter = 1;
+
+  for (const sub of processedSubs) {
+    const text = sub.text.trim();
+    if (!text) continue;
+
+    const sentences = text.split(TTS_PROCESS_CONFIG.splitPunctuation).filter(s => s.trim());
+
+    const timePerSentence = sub.duration / sentences.length;
+
+    sentences.forEach((sentence, index) => {
+      const cleanText = cleanTextForTTS(sentence);
+      if (!cleanText) return;
+
+      finalSubs.push({
+        id: `${sub.id}-${subtitleIdCounter++}`,
+        start: sub.start + index * timePerSentence,
+        duration: timePerSentence,
+        text: cleanText,
+        actualStartTime: sub.actualStartTime,
+      });
+    });
+  }
+
+  return {
+    ...track,
+    subtitles: finalSubs,
+  };
+}
+
+/**
+ * TTS文本清理：移除无语气标点，保留语气标点
+ * @param text 原始句子
+ * @returns 清理后适合TTS的文本
+ */
+function cleanTextForTTS(text: string): string {
+  return text
+    .trim()
+    .replace(TTS_PROCESS_CONFIG.neutralPunctuation, '')
+    .replace(/\s+/g, '');
+}
+
+/**
+ * 工具函数：直接获取可用于TTS请求的纯文本数组
+ */
+export function getTTSTextList(processedTrack: SubtitleTrack): string[] {
+  return processedTrack.subtitles.map(sub => sub.text);
+}
+
