@@ -58,6 +58,37 @@ function mergeNearbyRawSubtitles(subtitles: Subtitle[]): Subtitle[] {
   return merged;
 }
 
+function splitLongSegmentByPunctuation(text: string, minLen: number): string[] {
+  if (!text) return [];
+  if (text.length <= minLen) return [text];
+
+  const parts: string[] = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const remain = text.slice(cursor);
+    if (remain.length <= minLen) {
+      parts.push(remain);
+      break;
+    }
+
+    const indexAfterMin = remain.slice(minLen).search(/[。！？!?；;：…]/);
+
+    if (indexAfterMin >= 0) {
+      const splitPos = minLen + indexAfterMin + 1;
+      parts.push(remain.slice(0, splitPos));
+      cursor += splitPos;
+      continue;
+    }
+
+    // 该段中 minLen 之后没有标点，则把整段作为一个条目（不再硬切）
+    parts.push(remain);
+    break;
+  }
+
+  return parts;
+}
+
 export function splitSubtitleTextIntoSentences(text: string): string[] {
   const normalized = normalizeText(text);
   if (!normalized) return [];
@@ -91,7 +122,17 @@ export function splitSubtitleTextIntoSentences(text: string): string[] {
     }
   }
 
-  return segments.length > 0 ? segments : [normalized];
+  // 额外逻辑：确保每段不超过 60 字，不满足则继续按近标点切分
+  const normalizedSegments: string[] = [];
+  for (const segment of segments) {
+    if (segment.length <= 60) {
+      normalizedSegments.push(segment);
+    } else {
+      normalizedSegments.push(...splitLongSegmentByPunctuation(segment, 60));
+    }
+  }
+
+  return normalizedSegments.length > 0 ? normalizedSegments : [normalized];
 }
 
 export function splitSubtitlesBySentence(subtitles: Subtitle[]): Subtitle[] {

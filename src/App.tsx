@@ -8,6 +8,7 @@ import { Controls } from './components/Controls';
 import { SubtitleList } from './components/SubtitleList';
 import { Subtitle, SubtitleTrack, TTSSettings } from './types';
 import { ttsManager } from './lib/tts';
+import { processSubtitlesForTTS } from './lib/subtitles';
 import { Youtube, Zap } from 'lucide-react';
 import { addMessageListener, sendMessage } from './lib/messaging';
 
@@ -132,11 +133,15 @@ export default function App() {
               });
           
           if (prev.length === 0) setSelectedTrackId('intercepted');
-          
-          // Trigger pre-fetch
-          ttsManager.prefetch(filteredSubtitles, settings);
-          
-          return newTracks;
+
+          // Process full轨道（TTS 句切 + 60 字拆分）
+          const processedTracks = newTracks.map(track => processSubtitlesForTTS(track));
+          const activeTrack = processedTracks.find(track => track.id === selectedTrackId) || processedTracks[0];
+          if (activeTrack) {
+            ttsManager.prefetch(activeTrack.subtitles, settings);
+          }
+
+          return processedTracks;
         });
       }
 

@@ -43,11 +43,40 @@ export class TTSManager {
     const cleaned = text.replace(/\s+/g, ' ').trim();
     if (!cleaned) return [];
 
-    const matches = cleaned.match(/[^。.！？!?；;]+[。.！？!?；;]?/g);
-    if (!matches) return [cleaned];
+    const matches = cleaned.match(/[^。.！？!?；;：…]+[。.！？!?；;：…]?/g);
+    const baseSegments = matches ? matches.map(segment => segment.trim()).filter(Boolean) : [cleaned];
 
-    const segments = matches.map(segment => segment.trim()).filter(Boolean);
-    return segments.length > 0 ? segments : [cleaned];
+    // 额外拆分：如果单句超过60字，尝试找到最近的标点分割；否则按固定长度拆分
+    const finalSegments: string[] = [];
+    for (const segment of baseSegments) {
+      if (segment.length <= 60) {
+        finalSegments.push(segment);
+        continue;
+      }
+
+      let cursor = 0;
+      while (cursor < segment.length) {
+        const remain = segment.slice(cursor);
+        if (remain.length <= 60) {
+          finalSegments.push(remain);
+          break;
+        }
+
+        const indexAfterMin = remain.slice(60).search(/[。！？!?；;：…]/);
+        if (indexAfterMin >= 0) {
+          const splitPos = 60 + indexAfterMin + 1;
+          finalSegments.push(remain.slice(0, splitPos));
+          cursor += splitPos;
+          continue;
+        }
+
+        // 如果 60 之后没有标点，则拿整段（按用户需求，不强制截断）
+        finalSegments.push(remain);
+        break;
+      }
+    }
+
+    return finalSegments;
   }
 
   private speakSegment(text: string, settings: TTSSettings, rateOverride?: number) {
